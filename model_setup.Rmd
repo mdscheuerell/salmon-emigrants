@@ -1,0 +1,85 @@
+---
+title: "Possible option for modeling juvenile salmon emigrants based on escapement and trapping data"
+author: "Mark Scheuerell"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  pdf_document:
+    highlight: haddock
+fontsize: 11pt
+geometry: margin=1in
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center")
+
+## plot hook to increase margins
+local({
+  hook_old <- knitr::knit_hooks$get("plot")  # save the old hook
+  knitr::knit_hooks$set(plot = function(x, options) {
+    x <- c("\\vspace{0.5in}", hook_old(x, options))
+  })
+})
+
+## better captions
+library("captioner")
+## set default caption delimter
+fig_cap <- captioner(suffix = ".", style = "b", style_prefix = TRUE)
+```
+
+
+## Definitions
+
+Here are some definitions for model variables and parameters. They ignore location for now.
+
+* $S_y$: number of observed female spawners in brood year $y$ (data)
+
+* $N_y$: number of true female spawners in brood year $y$ (unknown state)
+
+* $f_y$: product of fecundity and egg-juvenile survival in year $y$ (unknown parameter)
+
+* $J_y$: total number of juveniles produced from brood year $y$ (unknown state)
+
+* $E_{d,k,y}$: number of true emigrants on day $d$ in season $k$ and year $y$ (unknown state)
+
+* $C_{d,k,y}$: number of juvenile emigrants caught in a trap on day $d$ in season $k$ and year $y$ (data)
+
+* $p_{k,y}$: capture probability of juvenile emigrants in season $k$ and year $y$ (unknown parameter)
+
+
+# Data models
+
+\begin{equation}
+\log(S_y) \sim \text{Normal}(\log(N_y), \sigma_S)
+\end{equation}
+
+\begin{gather}
+C_{d,k,y} \sim \text{Binomial}(E_{d,k,y}, p_{k,y}) \\
+p_{k,y} = \left( \frac{recaps}{releases} \right)_{k,y}
+\end{gather}
+
+
+
+# State models
+
+\begin{gather}
+J_y \sim \text{Poisson}(\lambda_y) \\
+\lambda_y = f_y N_y
+\end{gather}
+
+\begin{gather}
+J_y \sim \text{NegBin}(r, p) \\
+r = \frac{(f_y N_y)^2}{\sigma^2 - f_y N_y} \\
+p = \frac{r}{r + f_y N_y}
+\end{gather}
+
+\begin{gather}
+\log(E_{k,y}) \sim \text{Normal}(\log(g(J_{k,y})), \sigma_J) \\
+E_{k,y} = \sum^d E_{d,k,y} \\
+J_{k,y} = 
+  \begin{cases}
+    J_{k,y}, & \text{if k = 1} \\
+    J_{k-1,y} - E_{k-1,y},  & \text{if k > 1}
+  \end{cases}
+\end{gather}
+
+where $g(J_y)$ is a (potentially) nonlinear function mapping the density of juveniles onto the number of emigrants .
