@@ -1,7 +1,6 @@
 ---
-title: "Possible option for modeling juvenile salmon emigrants based on escapement and trapping data"
+title: "Possible option for modeling juvenile salmon emigrants based on adult escapement and trapping data"
 author: "Mark Scheuerell"
-date: "`r format(Sys.Date(), '%d %B %Y')`"
 output:
   pdf_document:
     highlight: haddock
@@ -27,53 +26,55 @@ fig_cap <- captioner(suffix = ".", style = "b", style_prefix = TRUE)
 ```
 
 
-## Definitions
+## Background
+
+This is a different way of approaching the modeling problem, which is based upon a more direct relationship between spawners, resulting offspring, and subsequent emigrants. There are no covariate effects in any of the relationships as written, but they could be added. 
+
+### Definitions
 
 Here are some definitions for model variables and parameters. They ignore location for now.
 
-* $S_y$: number of observed female spawners in brood year $y$ (data)
+* $S_y$: number of observed female spawners in year $y$ (data)
 
-* $N_y$: number of true female spawners in brood year $y$ (unknown state)
+* $N_y$: number of true female spawners in year $y$ (estimated state)
 
-* $f_y$: product of fecundity and egg-juvenile survival in year $y$ (unknown parameter)
+* $f_y$: product of fecundity and egg-to-juvenile survival in year $y$ (estimated parameter)
 
-* $J_y$: total number of juveniles produced from brood year $y$ (unknown state)
+* $J_y$: total number of juveniles produced from brood year $y$ (estimated state)
 
-* $E_{d,k,y}$: number of true emigrants on day $d$ in season $k$ and year $y$ (unknown state)
+* $E_{d,k,y}$: number of true emigrants on day $d$ in season $k$ and year $y$ (estimated state)
 
 * $C_{d,k,y}$: number of juvenile emigrants caught in a trap on day $d$ in season $k$ and year $y$ (data)
 
-* $p_{k,y}$: capture probability of juvenile emigrants in season $k$ and year $y$ (unknown parameter)
+* $M_{k,y}$: number of tagged juvenile emigrants released upstream in season $k$ and year $y$ (data)
+
+* $R_{k,y}$: number of tagged juvenile emigrants recaptured in season $k$ and year $y$ (data)
+
+* $p_{k,y}$: capture probability of juvenile emigrants in season $k$ and year $y$ (estimated parameter)
 
 
-# Data models
+## State models
 
-\begin{equation}
-\log(S_y) \sim \text{Normal}(\log(N_y), \sigma_S)
-\end{equation}
+Here I assume that the production of pre-emigrant juveniles is a linear function of the number of female spawners, such that
 
 \begin{gather}
-C_{d,k,y} \sim \text{Binomial}(E_{d,k,y}, p_{k,y}) \\
-p_{k,y} = \left( \frac{recaps}{releases} \right)_{k,y}
+J_y \sim \text{Poisson}(f_y N_y) \\
+\log(f_y) \sim \text{Normal}(\mu_f, \sigma_f)
 \end{gather}
 
-
-
-# State models
+or, if there is presumed overdispersion, then
 
 \begin{gather}
-J_y \sim \text{Poisson}(\lambda_y) \\
-\lambda_y = f_y N_y
+J_y \sim \text{NegBin}(r, a) \\
+r = \frac{(f_y N_y)^2}{\sigma_J - f_y N_y} \\
+a = \frac{r}{r + f_y N_y} \\
+\log(f_y) \sim \text{Normal}(\mu_f, \sigma_f)
 \end{gather}
 
-\begin{gather}
-J_y \sim \text{NegBin}(r, p) \\
-r = \frac{(f_y N_y)^2}{\sigma^2 - f_y N_y} \\
-p = \frac{r}{r + f_y N_y}
-\end{gather}
+The number of emigrants is then a function of the number of juveniles, such that
 
 \begin{gather}
-\log(E_{k,y}) \sim \text{Normal}(\log(g(J_{k,y})), \sigma_J) \\
+\log(E_{k,y}) \sim \text{Normal}(\log(g(J_{k,y})), \sigma_E) \\
 E_{k,y} = \sum^d E_{d,k,y} \\
 J_{k,y} = 
   \begin{cases}
@@ -82,4 +83,28 @@ J_{k,y} =
   \end{cases}
 \end{gather}
 
-where $g(J_y)$ is a (potentially) nonlinear function mapping the density of juveniles onto the number of emigrants .
+where $g(J_{k,y})$ is a (potentially nonlinear) function mapping the number of juveniles onto the number of emigrants.
+
+## Observation models
+
+The number of observed female spawners in year $t$ is assumed to be lognormally distributed about the true number of female spawners in year $t$, such that
+
+\begin{equation}
+\log(S_y) \sim \text{Normal}(\log(N_y), \sigma_S)
+\end{equation}
+
+The number of juvenile emigrants caught in a trap on day $d$ in season $k$ and year $y$ is a fraction of the total number of true emigrants on day $d$ in season $k$ and year $y$, such that
+
+\begin{gather}
+C_{d,k,y} \sim \text{Binomial}(E_{d,k,y}, p_{k,y}) \\
+p_{k,y} = \frac{R_{k,y}}{M_{k,y}}
+\end{gather}
+
+The cutpoints for identifying the life history variants (or "seasons" $k$) could be easily estimated as a mixture of univariate Gaussian distributions based upon the observed emigrants ($C_{d,k,y}$) across all years combined, such that
+
+\begin{gather}
+C_{d,k} = \sum^y C_{d,k,y} \\
+C_{d,k} \sim \text{Normal}(\mu_{z_k}, \sigma_{z_k}) \\
+z_k \sim \text{Categorical}(\boldsymbol{\phi})
+\end{gather}
+
